@@ -93,25 +93,44 @@ class TaskManager: ObservableObject {
     }
     
     private func applyFilters() {
+        print("=== applyFilters called ===")
+        print("Total tasks: \(tasks.count)")
+        print("Selected category: \(selectedCategory?.rawValue ?? "All")")
+        print("Show completed: \(showCompletedTasks)")
+        
         var filtered = tasks
         
         // 按类别筛选
         if let category = selectedCategory {
             filtered = filtered.filter { $0.category == category }
+            print("After category filter: \(filtered.count)")
         }
         
         // 按完成状态筛选
         if !showCompletedTasks {
             filtered = filtered.filter { !$0.isCompleted }
+            print("After completion filter: \(filtered.count)")
         }
         
-        filteredTasks = filtered
+        print("Final filtered count: \(filtered.count)")
+        
+        // 重要：确保在主线程更新UI
+        DispatchQueue.main.async {
+            self.filteredTasks = filtered
+            print("UI updated with \(self.filteredTasks.count) tasks")
+        }
     }
     
     func filterByCategory(_ category: TaskCategory?) {
+        print("filterByCategory called with: \(category?.rawValue ?? "nil")")
         selectedCategory = category
+        // 立即应用筛选，不等待 Combine 的异步更新
+        applyFilters()
     }
     
+    func refreshFilters() {
+        applyFilters()
+    }
     // MARK: - 错误处理
     
     func handleError(_ error: Error) {
