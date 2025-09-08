@@ -179,5 +179,3 @@ struct ShoppingItemData: Codable {
     }
 }
 
-// MARK: - ShoppingItem 需要支持初始化所有属性
-
