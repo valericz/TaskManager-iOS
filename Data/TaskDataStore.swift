@@ -5,22 +5,19 @@
 //  Created by WEIHUA ZHANG on 8/9/2025.
 //
 
-
 import Foundation
+
+
 
 class TaskDataStore {
     private let userDefaults = UserDefaults.standard
     private let tasksKey = "SavedTasks"
     
     func saveTasks(_ tasks: [any Task]) throws {
-        let taskData = tasks.compactMap { task -> TaskData? in
-            return TaskData.from(task: task)
-        }
-        
+        let taskData = tasks.compactMap { TaskData.from(task: $0) }
         guard let encoded = try? JSONEncoder().encode(taskData) else {
             throw TaskError.saveFailed
         }
-        
         userDefaults.set(encoded, forKey: tasksKey)
     }
     
@@ -29,12 +26,11 @@ class TaskDataStore {
               let taskData = try? JSONDecoder().decode([TaskData].self, from: data) else {
             throw TaskError.loadFailed
         }
-        
         return taskData.compactMap { $0.toTask() }
     }
 }
 
-// MARK: - 数据传输对象
+// MARK:DTO
 
 struct TaskData: Codable {
     let id: UUID
@@ -42,112 +38,110 @@ struct TaskData: Codable {
     let description: String
     let isCompleted: Bool
     let createdDate: Date
-    let categoryRawValue: String  // 改成存储 String
+    let categoryRawValue: String
     let taskType: TaskType
-    
-    // 类型特定数据
     let personalNote: String?
     let assignee: String?
     let deadline: Date?
     let budget: Double?
     let shoppingItems: [ShoppingItemData]?
     
-    enum TaskType: String, Codable {
-        case personal, work, shopping
-    }
+    enum TaskType: String, Codable { case personal, work, shopping }
     
-    // 计算属性来访问 TaskCategory
-    var category: TaskCategory {
-        return TaskCategory(rawValue: categoryRawValue) ?? .personal
-    }
-
+    var category: TaskCategory { TaskCategory(rawValue: categoryRawValue) ?? .personal }
     
+    // MARK: encode from model
     static func from(task: any Task) -> TaskData? {
-        if let personalTask = task as? PersonalTask {
+        if let p = task as? PersonalTask {
             return TaskData(
-                id: task.id,
-                title: task.title,
-                description: task.description,
-                isCompleted: task.isCompleted,
-                createdDate: task.createdDate,
-                categoryRawValue: task.category.rawValue,
+                id: p.id,
+                title: p.title,
+                description: p.description,
+                isCompleted: p.isCompleted,
+                createdDate: p.createdDate,
+                categoryRawValue: p.category.rawValue,
                 taskType: .personal,
-                personalNote: personalTask.personalNote,
+                personalNote: p.personalNote,
                 assignee: nil,
                 deadline: nil,
                 budget: nil,
                 shoppingItems: nil
             )
-        } else if let workTask = task as? WorkTask {
+        } else if let w = task as? WorkTask {
             return TaskData(
-                id: task.id,
-                title: task.title,
-                description: task.description,
-                isCompleted: task.isCompleted,
-                createdDate: task.createdDate,
-                categoryRawValue: task.category.rawValue,
+                id: w.id,
+                title: w.title,
+                description: w.description,
+                isCompleted: w.isCompleted,
+                createdDate: w.createdDate,
+                categoryRawValue: w.category.rawValue,
                 taskType: .work,
                 personalNote: nil,
-                assignee: workTask.assignee,
-                deadline: workTask.deadline,
+                assignee: w.assignee,
+                deadline: w.deadline,
                 budget: nil,
                 shoppingItems: nil
             )
-        } else if let shoppingTask = task as? ShoppingTask {
-            let itemsData = shoppingTask.items.map { ShoppingItemData.from(item: $0) }
+        } else if let s = task as? ShoppingTask {
+            let items = s.items.map { ShoppingItemData.from(item: $0) }
             return TaskData(
-                id: task.id,
-                title: task.title,
-                description: task.description,
-                isCompleted: task.isCompleted,
-                createdDate: task.createdDate,
-                categoryRawValue: task.category.rawValue,
+                id: s.id,
+                title: s.title,
+                description: s.description,
+                isCompleted: s.isCompleted,
+                createdDate: s.createdDate,
+                categoryRawValue: s.category.rawValue,
                 taskType: .shopping,
                 personalNote: nil,
                 assignee: nil,
                 deadline: nil,
-                budget: shoppingTask.budget,
-                shoppingItems: itemsData
+                budget: s.budget,
+                shoppingItems: items
             )
         }
-        
         return nil
     }
     
+    // MARK: decode to model
     func toTask() -> (any Task)? {
         switch taskType {
         case .personal:
-            let task = PersonalTask(
+            let t = PersonalTask(
+                id: id,
                 title: title,
                 description: description,
-                personalNote: personalNote ?? ""
+                personalNote: personalNote ?? "",
+                isCompleted: isCompleted,
+                createdDate: createdDate
             )
-            task.isCompleted = isCompleted
-            return task
-            
+            return t
         case .work:
-            let task = WorkTask(
+            let t = WorkTask(
+                id: id,
                 title: title,
                 description: description,
                 deadline: deadline,
-                assignee: assignee ?? ""
+                assignee: assignee ?? "",
+                isCompleted: isCompleted,
+                createdDate: createdDate
             )
-            task.isCompleted = isCompleted
-            return task
-            
+            return t
         case .shopping:
             let items = shoppingItems?.compactMap { $0.toShoppingItem() } ?? []
-            let task = ShoppingTask(
+            let t = ShoppingTask(
+                id: id,
                 title: title,
                 description: description,
                 items: items,
-                budget: budget ?? 0.0
+                budget: budget ?? 0.0,
+                isCompleted: isCompleted,
+                createdDate: createdDate
             )
-            task.isCompleted = isCompleted
-            return task
+            return t
         }
     }
 }
+
 
 struct ShoppingItemData: Codable {
     let id: UUID
@@ -158,7 +152,7 @@ struct ShoppingItemData: Codable {
     let isUrgent: Bool
     
     static func from(item: ShoppingItem) -> ShoppingItemData {
-        return ShoppingItemData(
+        ShoppingItemData(
             id: item.id,
             name: item.name,
             quantity: item.quantity,
@@ -169,7 +163,8 @@ struct ShoppingItemData: Codable {
     }
     
     func toShoppingItem() -> ShoppingItem {
-        return ShoppingItem(
+        ShoppingItem(
+            id: id,
             name: name,
             quantity: quantity,
             estimatedPrice: estimatedPrice,
@@ -178,4 +173,3 @@ struct ShoppingItemData: Codable {
         )
     }
 }
-

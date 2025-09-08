@@ -6,21 +6,9 @@
 //
 
 import Foundation
+import Combine
 
 // MARK: - Protocol: Task
-/// A common interface that all task types must conform to.
-/// Conforming types are reference types (`class`) because:
-/// - They adopt `ObservableObject` for SwiftUI bindings.
-/// - They are stored as `any Task` (existential) in arrays.
-///
-/// Required members:
-/// - `id`: Stable identifier for list diffing.
-/// - `title`, `description`: User-visible fields, editable.
-/// - `isCompleted`: Completion state; implementations may customize `complete()`.
-/// - `createdDate`: Immutable creation timestamp.
-/// - `category`: High-level type used for filtering and icons.
-/// - `getDisplayInfo()`: Short, user-readable summary for list rows.
-/// - `getPriority()`: Derived priority (e.g., based on deadline or content).
 protocol Task: ObservableObject, Identifiable {
     var id: UUID { get }
     var title: String { get set }
@@ -29,23 +17,17 @@ protocol Task: ObservableObject, Identifiable {
     var createdDate: Date { get }
     var category: TaskCategory { get }
     
-    /// Mark the task as completed. Default behavior may be overridden.
     func complete()
-    /// A short, human-friendly summary line for UI display.
     func getDisplayInfo() -> String
-    /// Priority derived from task data. Used to color indicators, sort, etc.
     func getPriority() -> TaskPriority
 }
 
 // MARK: - Enums
-
-/// High-level task categories for filtering and per-type UI.
 enum TaskCategory: String, CaseIterable {
     case personal = "Personal"
     case work = "Work"
     case shopping = "Shopping"
     
-    /// SF Symbol name used to render an icon for the category.
     var icon: String {
         switch self {
         case .personal: return "person.fill"
@@ -55,13 +37,11 @@ enum TaskCategory: String, CaseIterable {
     }
 }
 
-/// Coarse priority levels used by the UI. Can be computed per task type.
 enum TaskPriority: String, CaseIterable, Codable {
     case low = "Low"
     case medium = "Medium"
     case high = "High"
     
-    /// A simple textual color hint; UI maps this to actual SwiftUI `Color`.
     var color: String {
         switch self {
         case .low: return "green"
@@ -72,78 +52,97 @@ enum TaskPriority: String, CaseIterable, Codable {
 }
 
 // MARK: - BaseTask
-/// A concrete base class providing common storage and default behaviors
-/// for all task types. Subclasses add fields and override summaries/priority
-/// logic as needed.
 class BaseTask: Task {
-    /// Stable UUID for `Identifiable`.
-    let id = UUID()
-    /// Title shown prominently in the list.
+    let id: UUID
     @Published var title: String
-    /// Short description shown under the title.
     @Published var description: String
-    /// Completion status; toggled by `complete()` or the manager.
-    @Published var isCompleted: Bool = false
-    /// Creation timestamp; immutable once set.
-    let createdDate: Date = Date()
-    /// Category drives filtering and per-type UI (icon/fields).
+    @Published var isCompleted: Bool
+    let createdDate: Date
     let category: TaskCategory
     
-    init(title: String, description: String, category: TaskCategory) {
+    init(
+        id: UUID = UUID(),
+        title: String,
+        description: String,
+        category: TaskCategory,
+        isCompleted: Bool = false,
+        createdDate: Date = Date()
+    ) {
+        self.id = id
         self.title = title
         self.description = description
         self.category = category
+        self.isCompleted = isCompleted
+        self.createdDate = createdDate
     }
     
-    /// Default completion simply flips the flag to `true`.
-    /// Subclasses may extend this (e.g., mark child items purchased).
-    func complete() {
-        isCompleted = true
-    }
+    func complete() { isCompleted = true }
     
-    /// Default display string: "Title - Category".
     func getDisplayInfo() -> String {
-        return "\(title) - \(category.rawValue)"
+        "\(title) - \(category.rawValue)"
     }
     
-    /// Default priority is medium; subclasses provide smarter logic.
-    func getPriority() -> TaskPriority {
-        return .medium
-    }
+    func getPriority() -> TaskPriority { .medium }
 }
 
-// MARK: - Concrete Task Types (Inheritance / Composition)
+// MARK: - Concrete Task Types
 
-/// Personal task with an optional free-form note.
+// Personal
 class PersonalTask: BaseTask {
     @Published var personalNote: String
     
-    init(title: String, description: String, personalNote: String = "") {
+    init(
+        id: UUID = UUID(),
+        title: String,
+        description: String,
+        personalNote: String = "",
+        isCompleted: Bool = false,
+        createdDate: Date = Date()
+    ) {
         self.personalNote = personalNote
-        super.init(title: title, description: description, category: .personal)
+        super.init(
+            id: id,
+            title: title,
+            description: description,
+            category: .personal,
+            isCompleted: isCompleted,
+            createdDate: createdDate
+        )
     }
     
     override func getDisplayInfo() -> String {
-        return "\(super.getDisplayInfo()) - Personal Note: \(personalNote)"
+        "\(super.getDisplayInfo()) - Personal Note: \(personalNote)"
     }
     
-    /// Heuristic: if user added a note, treat as at least medium priority.
     override func getPriority() -> TaskPriority {
-        return personalNote.isEmpty ? .low : .medium
+        personalNote.isEmpty ? .low : .medium
     }
 }
 
-/// Work task with an optional deadline and assignee.
+// Work
 class WorkTask: BaseTask {
-    /// Optional due date; used to compute priority.
     @Published var deadline: Date?
-    /// Person responsible (could be self or teammate).
     @Published var assignee: String
     
-    init(title: String, description: String, deadline: Date? = nil, assignee: String = "") {
+    init(
+        id: UUID = UUID(),
+        title: String,
+        description: String,
+        deadline: Date? = nil,
+        assignee: String = "",
+        isCompleted: Bool = false,
+        createdDate: Date = Date()
+    ) {
         self.deadline = deadline
         self.assignee = assignee
-        super.init(title: title, description: description, category: .work)
+        super.init(
+            id: id,
+            title: title,
+            description: description,
+            category: .work,
+            isCompleted: isCompleted,
+            createdDate: createdDate
+        )
     }
     
     override func getDisplayInfo() -> String {
@@ -151,8 +150,83 @@ class WorkTask: BaseTask {
         return "\(super.getDisplayInfo()) - Deadline: \(deadlineStr), Assignee: \(assignee)"
     }
     
-    /// Priority based on how close the deadline is.
-    /// - ≤ 1 day: .high
-    /// - ≤ 7 days: .medium
-    /// - else or no deadline: .low
     override func getPriority() -> TaskPriority {
+        guard let deadline = deadline else { return .low }
+        let days = Calendar.current.dateComponents([.day], from: Date(), to: deadline).day ?? .max
+        if days <= 1 { return .high }
+        if days <= 7 { return .medium }
+        return .low
+    }
+}
+
+// MARK: - Shopping domain types
+
+/// 单个购物条目
+struct ShoppingItem: Identifiable {
+    let id: UUID
+    var name: String
+    var quantity: Int
+    var estimatedPrice: Double
+    var isPurchased: Bool
+    var isUrgent: Bool
+    
+    init(
+        id: UUID = UUID(),
+        name: String,
+        quantity: Int,
+        estimatedPrice: Double,
+        isPurchased: Bool = false,
+        isUrgent: Bool = false
+    ) {
+        self.id = id
+        self.name = name
+        self.quantity = quantity
+        self.estimatedPrice = estimatedPrice
+        self.isPurchased = isPurchased
+        self.isUrgent = isUrgent
+    }
+}
+
+/// 购物任务
+class ShoppingTask: BaseTask {
+    @Published var items: [ShoppingItem]
+    @Published var budget: Double
+    
+    init(
+        id: UUID = UUID(),
+        title: String,
+        description: String,
+        items: [ShoppingItem] = [],
+        budget: Double = 0.0,
+        isCompleted: Bool = false,
+        createdDate: Date = Date()
+    ) {
+        self.items = items
+        self.budget = budget
+        super.init(
+            id: id,
+            title: title,
+            description: description,
+            category: .shopping,
+            isCompleted: isCompleted,
+            createdDate: createdDate
+        )
+    }
+    
+    override func getDisplayInfo() -> String {
+        let bought = items.filter { $0.isPurchased }.count
+        return "\(super.getDisplayInfo()) - Items: \(items.count) (\(bought) bought), Budget: \(budget)"
+    }
+    
+    override func getPriority() -> TaskPriority {
+        if items.contains(where: { $0.isUrgent && !$0.isPurchased }) { return .high }
+        return items.isEmpty ? .low : .medium
+    }
+    
+    override func complete() {
+        items = items.map { i in
+            var c = i; c.isPurchased = true; return c
+        }
+        super.complete()
+    }
+}
