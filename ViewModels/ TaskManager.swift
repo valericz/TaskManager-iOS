@@ -1,5 +1,5 @@
 //
-//   TaskManager.swift
+//  TaskManager.swift
 //  TaskManager
 //
 //  Created by WEIHUA ZHANG on 8/9/2025.
@@ -25,7 +25,7 @@ class TaskManager: ObservableObject {
         applyFilters()
     }
     
-    // MARK: - 任务管理方法
+    // MARK: - Task management methods
     
     func addTask(_ task: any Task) throws {
         guard !task.title.isEmpty else {
@@ -72,7 +72,7 @@ class TaskManager: ObservableObject {
         applyFilters()
     }
     
-    // MARK: - 数据持久化
+    // MARK: - Data persistence
     
     private func saveTasks() {
         do {
@@ -87,13 +87,13 @@ class TaskManager: ObservableObject {
             tasks = try dataStore.loadTasks()
             applyFilters()
         } catch {
-            // 如果加载失败，使用示例数据
+            // If loading fails, fall back to sample data
             loadSampleTasks()
             handleError(TaskError.loadFailed)
         }
     }
     
-    // MARK: - 筛选功能
+    // MARK: - Filtering
     
     private func setupFiltering() {
         Publishers.CombineLatest3($tasks, $selectedCategory, $showCompletedTasks)
@@ -111,13 +111,13 @@ class TaskManager: ObservableObject {
         
         var filtered = tasks
         
-        // 按类别筛选
+        // Filter by category
         if let category = selectedCategory {
             filtered = filtered.filter { $0.category == category }
             print("After category filter: \(filtered.count)")
         }
         
-        // 按完成状态筛选
+        // Filter by completion status
         if !showCompletedTasks {
             filtered = filtered.filter { !$0.isCompleted }
             print("After completion filter: \(filtered.count)")
@@ -125,7 +125,7 @@ class TaskManager: ObservableObject {
         
         print("Final filtered count: \(filtered.count)")
         
-        // 重要：确保在主线程更新UI
+        // Important: update UI on the main thread
         DispatchQueue.main.async {
             self.filteredTasks = filtered
             print("UI updated with \(self.filteredTasks.count) tasks")
@@ -135,21 +135,22 @@ class TaskManager: ObservableObject {
     func filterByCategory(_ category: TaskCategory?) {
         print("filterByCategory called with: \(category?.rawValue ?? "nil")")
         selectedCategory = category
-        // 立即应用筛选，不等待 Combine 的异步更新
+        // Apply filters immediately instead of waiting for Combine’s async updates
         applyFilters()
     }
     
     func refreshFilters() {
         applyFilters()
     }
-    // MARK: - 错误处理
+    
+    // MARK: - Error handling
     
     func handleError(_ error: Error) {
         errorMessage = error.localizedDescription
         showError = true
     }
     
-    // MARK: - 示例数据
+    // MARK: - Sample data
     
     private func loadSampleTasks() {
         let personalTask = PersonalTask(
