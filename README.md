@@ -3,7 +3,7 @@
 **Assessment Task 2: iOS Application Development with Object and Protocol-Oriented Concepts**  
 **Course:** 40005 Advanced iOS Development - Spring 2025  
 **Author:** Weihua Zhang  
-**Date:** September 2024
+**Date:** September 2025
 
 ## Project Overview
 
