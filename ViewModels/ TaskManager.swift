@@ -21,7 +21,8 @@ class TaskManager: ObservableObject {
     
     init() {
         setupFiltering()
-        loadTasks()
+        loadSampleTasks()
+        applyFilters()
     }
     
     // MARK: - 任务管理方法
@@ -42,6 +43,16 @@ class TaskManager: ObservableObject {
         }
         
         tasks.remove(at: index)
+        saveTasks()
+        applyFilters()
+    }
+    
+    func updateTask(_ updatedTask: any Task) throws {
+        guard let index = tasks.firstIndex(where: { $0.id == updatedTask.id }) else {
+            throw TaskError.taskNotFound
+        }
+        
+        tasks[index] = updatedTask
         saveTasks()
         applyFilters()
     }
@@ -167,5 +178,8 @@ class TaskManager: ObservableObject {
         
         tasks = [personalTask, workTask, shoppingTask]
         applyFilters()
+        
+        print("Sample tasks loaded: \(tasks.count)")
+        print("Filtered tasks: \(filteredTasks.count)")
     }
 }
